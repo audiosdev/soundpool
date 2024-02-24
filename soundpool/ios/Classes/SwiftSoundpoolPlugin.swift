@@ -278,12 +278,12 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
                 } else {
                     result(-1)
                 }
-        case "setVolume":
+       case "setVolume":
             let streamId = attributes["streamId"] as? Int
             let soundId = attributes["soundId"] as? Int
             let volume = attributes["volume"] as? Double
-            let volumeLeft = attributes["volumeLeft"] as! Double
-            let volumeRight = attributes["volumeRight"] as! Double
+            let volumeLeft = attributes["volumeLeft"] as? Double
+            let volumeRight = attributes["volumeRight"] as? Double
 
             var audioPlayer: AVAudioPlayer? = nil;
             if (streamId != nil){
@@ -292,20 +292,23 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
                 audioPlayer = playerBySoundId(soundId: soundId!)
             }
 
-            // Normalize volumeLeft and volumeRight to ensure they sum up to 1.0
-            let totalVolume = volumeLeft + volumeRight
-            let normalizedVolumeLeft = volumeLeft / totalVolume
-            let normalizedVolumeRight = volumeRight / totalVolume
+            if let volumeLeft = volumeLeft, let volumeRight = volumeRight {
+                // Normalize volumeLeft and volumeRight to ensure they sum up to 1.0
+                let totalVolume = volumeLeft + volumeRight
+                let normalizedVolumeLeft = volumeLeft / totalVolume
+                let normalizedVolumeRight = volumeRight / totalVolume
 
-            audioPlayer?.pan = Float(normalizedVolumeRight - normalizedVolumeLeft) // Set panning
-    
+                audioPlayer?.pan = Float(normalizedVolumeRight - normalizedVolumeLeft) // Set panning
+            }
+
             if let volume = volume {
                 audioPlayer?.volume = Float(volume) // Set specified volume
             } else {
-                audioPlayer?.volume = Float((volumeLeft + volumeRight) / 2) // Set average volume
+                audioPlayer?.volume = Float((volumeLeft ?? 0.5) + (volumeRight ?? 0.5)) // Set average volume if volume is not provided
             }
-                
+
             result(nil)
+
             case "setRate":
                 if (enableRate){
                     let streamId = attributes["streamId"] as! Int
