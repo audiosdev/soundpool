@@ -373,4 +373,3 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
         }
     }
 }
-```
