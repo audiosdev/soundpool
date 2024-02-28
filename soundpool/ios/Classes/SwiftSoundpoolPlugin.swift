@@ -2,11 +2,6 @@ import Flutter
 import UIKit
 import AVFoundation
 
-
-import Flutter
-import UIKit
-import AVFoundation
-
 public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
     public static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(name: "pl.ukaszapps/soundpool", binaryMessenger: registrar.messenger())
