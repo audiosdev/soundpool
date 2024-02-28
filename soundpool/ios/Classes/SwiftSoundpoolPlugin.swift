@@ -2,7 +2,7 @@ import Flutter
 import UIKit
 import AVFoundation
 
-class SoundpoolWrapper : NSObject {
+class SwiftSoundpoolPlugin : NSObject {
     private var maxStreams: Int
     private var enableRate: Bool
     private var streamIdProvider = Atomic<Int>(0)
@@ -208,8 +208,8 @@ class SoundpoolWrapper : NSObject {
     private class SoundpoolDelegate: NSObject, AVAudioPlayerDelegate {
         private var soundId: Int
         private var streamId: Int
-        private var pool: SoundpoolWrapper
-        init(pool: SoundpoolWrapper, soundId: Int, streamId: Int) {
+        private var pool: SwiftSoundpoolPlugin
+        init(pool: SwiftSoundpoolPlugin, soundId: Int, streamId: Int) {
             self.soundId = soundId
             self.pool = pool
             self.streamId = streamId
