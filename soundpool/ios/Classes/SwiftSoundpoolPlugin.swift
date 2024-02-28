@@ -74,7 +74,6 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
             
             let category: AVAudioSession.Category
             switch categoryAttr {
-            /*
             case "ambient":
                 category = .ambient
             case "playback":
@@ -83,12 +82,10 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
                 category = .playAndRecord
             case "multiRoute":
                 category = .multiRoute
-            */
             default:
-                category = .playback;//.soloAmbient
+                category = .soloAmbient
                 
             }
-            
             let mode: AVAudioSession.Mode
             switch modeAttr {
             case "moviePlayback":
