@@ -2,6 +2,7 @@ import Flutter
 import UIKit
 import AVFoundation
 
+
 public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
     public static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(name: "pl.ukaszapps/soundpool", binaryMessenger: registrar.messenger())
@@ -10,22 +11,28 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
     }
     
     private let counter = Atomic<Int>(0)
+    
     private lazy var wrappers = Dictionary<Int,SwiftSoundpoolPlugin.SoundpoolWrapper>()
     
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         switch call.method {
         case "initSoundpool":
+            // TODO create distinction between different types of audio playback
             let attributes = call.arguments as! NSDictionary
+            
             initAudioSession(attributes)
+            
             let maxStreams = attributes["maxStreams"] as! Int
             let enableRate = (attributes["ios_enableRate"] as? Bool) ?? true
             let wrapper = SoundpoolWrapper(maxStreams, enableRate)
+            
             let index = counter.increment()
-            wrappers[index] = wrapper
+            wrappers[index] = wrapper;
             result(index)
         case "dispose":
             let attributes = call.arguments as! NSDictionary
             let index = attributes["poolId"] as! Int
+            
             guard let wrapper = wrapperById(id: index) else {
                 print("Dispose attempt on not available pool (id: \(index)).")
                 result(FlutterError( code: "invalidArgs",
@@ -39,6 +46,7 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
         default:
             let attributes = call.arguments as! NSDictionary
             let index = attributes["poolId"] as! Int
+            
             guard let wrapper = wrapperById(id: index) else {
                 print("Action '\(call.method)' attempt on not available pool (id: \(index)).")
                 result(FlutterError( code: "invalidArgs",
@@ -52,14 +60,18 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
     
     private func initAudioSession(_ attributes: NSDictionary) {
         if #available(iOS 10.0, *) {
+            // guard against audio_session plugin and avoid doing redundant session management
             if (NSClassFromString("AudioSessionPlugin") != nil) {
                 print("AudioSession should be managed by 'audio_session' plugin")
                 return
             }
+            
+            
             guard let categoryAttr = attributes["ios_avSessionCategory"] as? String else {
                 return
             }
             let modeAttr = attributes["ios_avSessionMode"] as! String
+            
             let category: AVAudioSession.Category
             switch categoryAttr {
             case "ambient":
@@ -72,6 +84,7 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
                 category = .multiRoute
             default:
                 category = .soloAmbient
+                
             }
             let mode: AVAudioSession.Mode
             switch modeAttr {
@@ -96,6 +109,7 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
                 try AVAudioSession.sharedInstance().setCategory(category, mode: mode)
                 print("Audio session updated: category = '\(category)', mode = '\(mode)'.")
             } catch (let e) {
+                //do nothing
                 print("Error while trying to set audio category: '\(e)'")
             }
         }
@@ -111,10 +125,15 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
     
     class SoundpoolWrapper : NSObject {
         private var maxStreams: Int
+        
         private var enableRate: Bool
+        
         private var streamIdProvider = Atomic<Int>(0)
+        
         private lazy var soundpool = [AVAudioPlayer]()
+        
         private lazy var streamsCount: Dictionary<Int, Int> = [Int: Int]()
+        
         private lazy var nowPlaying: Dictionary<Int, NowPlaying> = [Int: NowPlaying]()
         
         init(_ maxStreams: Int, _ enableRate: Bool){
@@ -124,6 +143,7 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
         
         public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
             let attributes = call.arguments as! NSDictionary
+            //            print("\(call.method): \(attributes)")
             switch call.method {
             case "load":
                 let rawSound = attributes["rawSound"] as! FlutterStandardTypedData
