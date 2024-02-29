@@ -348,27 +348,6 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
         private func playerBySoundId(soundId: Int) -> AVAudioPlayer? {
             return (soundId >= 0 && soundId < soundpool.count) ? soundpool[soundId] : nil
         }
-
-        private class SoundpoolDelegate: NSObject, AVAudioPlayerDelegate {
-            private var soundId: Int
-            private var streamId: Int
-            private weak var pool: SoundpoolWrapper?
-
-            init(pool: SoundpoolWrapper, soundId: Int, streamId: Int) {
-                self.soundId = soundId
-                self.pool = pool
-                self.streamId = streamId
-            }
-
-            func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-                pool?.decreaseCounter(soundId: soundId, streamId: streamId)
-            }
-        }
-
-        func decreaseCounter(soundId: Int, streamId: Int) {
-            streamsCount[soundId] = (streamsCount[soundId] ?? 1) - 1
-            nowPlaying.removeValue(forKey: streamId)
-        }
     }
 
     private struct NowPlaying {
@@ -377,3 +356,18 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
     }
 }
 
+class SoundpoolDelegate: NSObject, AVAudioPlayerDelegate {
+    private var soundId: Int
+    private var streamId: Int
+    private weak var pool: SwiftSoundpoolPlugin.SoundpoolWrapper?
+
+    init(pool: SwiftSoundpoolPlugin.SoundpoolWrapper, soundId: Int, streamId: Int) {
+        self.soundId = soundId
+        self.pool = pool
+        self.streamId = streamId
+    }
+
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        pool?.decreaseCounter(soundId: soundId, streamId: streamId)
+    }
+}
