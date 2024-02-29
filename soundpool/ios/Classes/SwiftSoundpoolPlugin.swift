@@ -128,7 +128,7 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
         let wrapper = wrappers[id]
         return wrapper
     }
-}
+
 
 class SoundpoolWrapper : NSObject {
     private var maxStreams: Int
@@ -365,4 +365,5 @@ class SoundpoolWrapper : NSObject {
         let player: AVAudioPlayer
         let delegate: SoundpoolDelegate
     }
+ }
 }
