@@ -304,7 +304,7 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
             }
         }
     }
-}
+
 
         
         func stopAllStreams() {
