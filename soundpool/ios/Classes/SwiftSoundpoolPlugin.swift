@@ -371,7 +371,7 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
                 decreaseCounter()
             }
           
-    func decreaseCounter(){
+   func decreaseCounter(){
     pool.streamsCount[soundId] = (pool.streamsCount[soundId] ?? 1) - 1
     pool.nowPlaying.removeValue(forKey: streamId)
     // Switch to the next player if looping is enabled
@@ -385,9 +385,7 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
         let nextNextSoundIndex = (pool.currentSoundIndex + 1) % pool.soundpool.count
         let nextNextAudioPlayer = pool.soundpool[nextNextSoundIndex]
         nextNextAudioPlayer.prepareToPlay()
-        nextNextAudioPlayer.play()
         nextNextAudioPlayer.currentTime = 0  // Start from the beginning
-
         nextNextAudioPlayer.pause() // Pause immediately to prepare for seamless transition
     }
 }
