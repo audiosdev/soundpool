@@ -10,7 +10,7 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
     }
     
     private let counter = Atomic<Int>(0)
-    private lazy var wrappers = Dictionary<Int, SwiftSoundpoolPlugin.SoundpoolWrapper>()
+    private lazy var wrappers = Dictionary<Int, SoundpoolWrapper>()
     
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         switch call.method {
@@ -113,7 +113,7 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
         }
     }
     
-    private func wrapperById(id: Int) -> SwiftSoundpoolPlugin.SoundpoolWrapper? {
+    private func wrapperById(id: Int) -> SoundpoolWrapper? {
         if (id < 0){
             return nil
         }
@@ -135,12 +135,17 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
             self.maxStreams = maxStreams
             self.enableRate = enableRate
 
-               // Register for AVPlayerItemDidPlayToEndTime notification
+            // Register for AVPlayerItemDidPlayToEndTime notification
             observation = NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: nil, queue: nil) { [weak self] notification in
-            self?.playerItemDidReachEnd(notification: notification)
+                self?.playerItemDidReachEnd(notification: notification)
             }
         }
-        
+
+        deinit {
+            // Unregister the notification
+            NotificationCenter.default.removeObserver(observation!)
+        }
+
         public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
             let attributes = call.arguments as! NSDictionary
             switch call.method {
@@ -323,17 +328,12 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
             default:
                 result("notImplemented")
             }
-
-        deinit {
-            // Unregister the notification
-            NotificationCenter.default.removeObserver(observation!)
         }
 
         @objc func playerItemDidReachEnd(notification: Notification) {
             if let playerItem = notification.object as? AVPlayerItem {
-            playerItem.seek(to: .zero, completionHandler: nil)
+                playerItem.seek(to: .zero, completionHandler: nil)
             }
-
         }
         
         func stopAllStreams() {
