@@ -137,6 +137,11 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
         init(_ maxStreams: Int, _ enableRate: Bool){
             self.maxStreams = maxStreams
             self.enableRate = enableRate
+
+               // Register for AVPlayerItemDidPlayToEndTime notification
+            observation = NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: nil, queue: nil) { [weak self] notification in
+            self?.playerItemDidReachEnd(notification: notification)
+            }
         }
         
         public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -321,6 +326,17 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
             default:
                 result("notImplemented")
             }
+
+        deinit {
+            // Unregister the notification
+            NotificationCenter.default.removeObserver(observation!)
+        }
+
+        @objc func playerItemDidReachEnd(notification: Notification) {
+            if let playerItem = notification.object as? AVPlayerItem {
+            playerItem.seek(to: .zero, completionHandler: nil)
+            }
+
         }
         
         func stopAllStreams() {
