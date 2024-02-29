@@ -348,15 +348,14 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
         private func playerBySoundId(soundId: Int) -> AVAudioPlayer? {
             return (soundId >= 0 && soundId < soundpool.count) ? soundpool[soundId] : nil
         }
+
+        private func decreaseCounter(soundId: Int, streamId: Int) {
+            streamsCount[soundId] = (streamsCount[soundId] ?? 1) - 1
+            nowPlaying.removeValue(forKey: streamId)
+        }
     }
 
-    private struct NowPlaying {
-        let player: AVAudioPlayer
-        let delegate: SoundpoolDelegate
-    }
-}
-
-class SoundpoolDelegate: NSObject, AVAudioPlayerDelegate {
+    class SoundpoolDelegate: NSObject, AVAudioPlayerDelegate {
     private var soundId: Int
     private var streamId: Int
     private weak var pool: SwiftSoundpoolPlugin.SoundpoolWrapper?
@@ -371,3 +370,10 @@ class SoundpoolDelegate: NSObject, AVAudioPlayerDelegate {
         pool?.decreaseCounter(soundId: soundId, streamId: streamId)
     }
 }
+    private struct NowPlaying {
+        let player: AVAudioPlayer
+        let delegate: SoundpoolDelegate
+    }
+}
+
+
