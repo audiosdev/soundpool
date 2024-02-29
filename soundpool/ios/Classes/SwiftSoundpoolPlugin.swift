@@ -377,19 +377,4 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
     }
 }
 
-// Helper atomic class
-class Atomic<T> {
-    private var value: T
-    private let lock = NSLock()
-
-    init(_ value: T) {
-        self.value = value
-    }
-
-    func increment() -> T {
-        lock.lock(); defer { lock.unlock() }
-        let oldValue = value
-        value = value.advanced(by: 1)
-        return oldValue
-    }
 }
