@@ -135,6 +135,8 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
             self.maxStreams = maxStreams
             self.enableRate = enableRate
 
+            super.init()
+
             // Register for AVPlayerItemDidPlayToEndTime notification
             observation = NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: nil, queue: nil) { [weak self] notification in
                 self?.playerItemDidReachEnd(notification: notification)
