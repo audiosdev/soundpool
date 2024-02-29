@@ -305,47 +305,45 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
         }
     }
 
-
-        
-        func stopAllStreams() {
-            for audioPlayer in soundpool {
-                audioPlayer.stop()
-            }
+    func stopAllStreams() {
+        for audioPlayer in soundpool {
+            audioPlayer.stop()
         }
-        private func playerByStreamId(streamId: Int) -> NowPlaying? {
-            let audioPlayer = nowPlaying[streamId]
-            return audioPlayer
+    }
+    
+    private func playerByStreamId(streamId: Int) -> NowPlaying? {
+        let audioPlayer = nowPlaying[streamId]
+        return audioPlayer
+    }
+    
+    private func playerBySoundId(soundId: Int) -> AVAudioPlayer? {
+        if (soundId >= soundpool.count || soundId < 0){
+            return nil
         }
-        
-        private func playerBySoundId(soundId: Int) -> AVAudioPlayer? {
-            if (soundId >= soundpool.count || soundId < 0){
-                return nil
-            }
-            let audioPlayer = soundpool[soundId]
-            return audioPlayer
+        let audioPlayer = soundpool[soundId]
+        return audioPlayer
+    }
+    
+    private class SoundpoolDelegate: NSObject, AVAudioPlayerDelegate {
+        private var soundId: Int
+        private var streamId: Int
+        private var pool: SoundpoolWrapper
+        init(pool: SoundpoolWrapper, soundId: Int, streamId: Int) {
+            self.soundId = soundId
+            self.pool = pool
+            self.streamId = streamId
         }
-        
-        private class SoundpoolDelegate: NSObject, AVAudioPlayerDelegate {
-            private var soundId: Int
-            private var streamId: Int
-            private var pool: SoundpoolWrapper
-            init(pool: SoundpoolWrapper, soundId: Int, streamId: Int) {
-                self.soundId = soundId
-                self.pool = pool
-                self.streamId = streamId
-            }
-            func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-                decreaseCounter()
-            }
-            func decreaseCounter(){
-                pool.streamsCount[soundId] = (pool.streamsCount[soundId] ?? 1) - 1
-                pool.nowPlaying.removeValue(forKey: streamId)
-            }
+        func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+            decreaseCounter()
         }
-        
-        private struct NowPlaying {
-            let player: AVAudioPlayer
-            let delegate: SoundpoolDelegate
+        func decreaseCounter(){
+            pool.streamsCount[soundId] = (pool.streamsCount[soundId] ?? 1) - 1
+            pool.nowPlaying.removeValue(forKey: streamId)
         }
+    }
+    
+    private struct NowPlaying {
+        let player: AVAudioPlayer
+        let delegate: SoundpoolDelegate
     }
 }
