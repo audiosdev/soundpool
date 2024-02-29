@@ -123,16 +123,13 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
     
     class SoundpoolWrapper : NSObject {
         private var maxStreams: Int
-        
         private var enableRate: Bool
-        
         private var streamIdProvider = Atomic<Int>(0)
-        
         private lazy var soundpool = [AVAudioPlayer]()
-        
         private lazy var streamsCount: Dictionary<Int, Int> = [Int: Int]()
-        
         private lazy var nowPlaying: Dictionary<Int, NowPlaying> = [Int: NowPlaying]()
+        private lazy var cachedPlayers: [AVAudioPlayer] = []
+        private var observation: NSObjectProtocol?
         
         init(_ maxStreams: Int, _ enableRate: Bool){
             self.maxStreams = maxStreams
