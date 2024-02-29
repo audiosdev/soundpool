@@ -235,7 +235,6 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
                     } else {
                         result(0) // failed to play sound
                     }
-                    // lets recreate the audioPlayer for next request - setting numberOfLoops has initially no effect
 
                     if let previousData = audioPlayer.data {
                         audioPlayer = try AVAudioPlayer(data: previousData)
@@ -272,7 +271,6 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
                     let audioPlayer = nowPlaying.player
                     audioPlayer.stop()
                     result(streamId)
-                    // removing player
                     self.nowPlaying.removeValue(forKey: streamId)
                     nowPlaying.delegate.decreaseCounter()
                     audioPlayer.delegate = nil
@@ -294,18 +292,17 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
                 }
 
                 if let volumeLeft = volumeLeft, let volumeRight = volumeRight {
-                    // Normalize volumeLeft and volumeRight to ensure they sum up to 1.0
                     let totalVolume = volumeLeft + volumeRight
                     let normalizedVolumeLeft = volumeLeft / totalVolume
                     let normalizedVolumeRight = volumeRight / totalVolume
 
-                    audioPlayer?.pan = Float(normalizedVolumeRight - normalizedVolumeLeft) // Set panning
+                    audioPlayer?.pan = Float(normalizedVolumeRight - normalizedVolumeLeft)
                 }
 
                 if let volume = volume {
-                    audioPlayer?.volume = Float(volume) // Set specified volume
+                    audioPlayer?.volume = Float(volume)
                 } else {
-                    audioPlayer?.volume = Float((volumeLeft ?? 0.5) + (volumeRight ?? 0.5)) // Set average volume if volume is not provided
+                    audioPlayer?.volume = Float((volumeLeft ?? 0.5) + (volumeRight ?? 0.5))
                 }
 
                 result(nil)
@@ -332,6 +329,7 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
                 audioPlayer.stop()
             }
         }
+
         private func playerByStreamId(streamId: Int) -> NowPlaying? {
             let audioPlayer = nowPlaying[streamId]
             return audioPlayer
@@ -345,6 +343,19 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
             return audioPlayer
         }
 
+        private func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer) {
+            if let soundId = soundpool.firstIndex(of: player) {
+                decreaseCounter(soundId: soundId)
+            }
+        }
+
+        private func decreaseCounter(soundId: Int){
+            streamsCount[soundId] = (streamsCount[soundId] ?? 1) - 1
+            if let streamIdToRemove = nowPlaying.first(where: { $0.value.player == playerBySoundId(soundId: soundId) })?.key {
+                nowPlaying.removeValue(forKey: streamIdToRemove)
+            }
+        }
+
         private class SoundpoolDelegate: NSObject, AVAudioPlayerDelegate {
             private var soundId: Int
             private var streamId: Int
@@ -355,11 +366,7 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
                 self.streamId = streamId
             }
             func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-                decreaseCounter()
-            }
-            func decreaseCounter(){
-                pool.streamsCount[soundId] = (pool.streamsCount[soundId] ?? 1) - 1
-                pool.nowPlaying.removeValue(forKey: streamId)
+                pool.decreaseCounter(soundId: soundId)
             }
         }
 
