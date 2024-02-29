@@ -2,34 +2,37 @@ import Flutter
 import UIKit
 import AVFoundation
 
+
 public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
     public static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(name: "pl.ukaszapps/soundpool", binaryMessenger: registrar.messenger())
         let instance = SwiftSoundpoolPlugin()
         registrar.addMethodCallDelegate(instance, channel: channel)
     }
-
+    
     private let counter = Atomic<Int>(0)
-    private lazy var wrappers = Dictionary<Int, SoundpoolWrapper>()
-
+    
+    private lazy var wrappers = Dictionary<Int,SwiftSoundpoolPlugin.SoundpoolWrapper>()
+    
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         switch call.method {
         case "initSoundpool":
+            // TODO create distinction between different types of audio playback
             let attributes = call.arguments as! NSDictionary
-
+            
             initAudioSession(attributes)
-
+            
             let maxStreams = attributes["maxStreams"] as! Int
             let enableRate = (attributes["ios_enableRate"] as? Bool) ?? true
             let wrapper = SoundpoolWrapper(maxStreams, enableRate)
-
+            
             let index = counter.increment()
-            wrappers[index] = wrapper
+            wrappers[index] = wrapper;
             result(index)
         case "dispose":
             let attributes = call.arguments as! NSDictionary
             let index = attributes["poolId"] as! Int
-
+            
             guard let wrapper = wrapperById(id: index) else {
                 print("Dispose attempt on not available pool (id: \(index)).")
                 result(FlutterError( code: "invalidArgs",
@@ -43,7 +46,7 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
         default:
             let attributes = call.arguments as! NSDictionary
             let index = attributes["poolId"] as! Int
-
+            
             guard let wrapper = wrapperById(id: index) else {
                 print("Action '\(call.method)' attempt on not available pool (id: \(index)).")
                 result(FlutterError( code: "invalidArgs",
@@ -54,19 +57,21 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
             wrapper.handle(call, result: result)
         }
     }
-
+    
     private func initAudioSession(_ attributes: NSDictionary) {
         if #available(iOS 10.0, *) {
+            // guard against audio_session plugin and avoid doing redundant session management
             if (NSClassFromString("AudioSessionPlugin") != nil) {
                 print("AudioSession should be managed by 'audio_session' plugin")
                 return
             }
-
+            
+            
             guard let categoryAttr = attributes["ios_avSessionCategory"] as? String else {
                 return
             }
             let modeAttr = attributes["ios_avSessionMode"] as! String
-
+            
             let category: AVAudioSession.Category
             switch categoryAttr {
             case "ambient":
@@ -79,6 +84,7 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
                 category = .multiRoute
             default:
                 category = .soloAmbient
+                
             }
             let mode: AVAudioSession.Mode
             switch modeAttr {
@@ -103,48 +109,41 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
                 try AVAudioSession.sharedInstance().setCategory(category, mode: mode)
                 print("Audio session updated: category = '\(category)', mode = '\(mode)'.")
             } catch (let e) {
+                //do nothing
                 print("Error while trying to set audio category: '\(e)'")
             }
         }
     }
-
-    private func wrapperById(id: Int) -> SoundpoolWrapper? {
+    
+    private func wrapperById(id: Int) -> SwiftSoundpoolPlugin.SoundpoolWrapper? {
         if (id < 0){
             return nil
         }
         let wrapper = wrappers[id]
         return wrapper
     }
-
+    
     class SoundpoolWrapper : NSObject {
         private var maxStreams: Int
+        
         private var enableRate: Bool
+        
         private var streamIdProvider = Atomic<Int>(0)
+        
         private lazy var soundpool = [AVAudioPlayer]()
-        private var currentSoundIndex = 0
+        
         private lazy var streamsCount: Dictionary<Int, Int> = [Int: Int]()
+        
         private lazy var nowPlaying: Dictionary<Int, NowPlaying> = [Int: NowPlaying]()
-        private lazy var cachedPlayers: [AVAudioPlayer] = []
-        private var observation: NSObjectProtocol?
-
+        
         init(_ maxStreams: Int, _ enableRate: Bool){
             self.maxStreams = maxStreams
             self.enableRate = enableRate
-
-            super.init()
-
-            observation = NotificationCenter.default.addObserver(forName: .AVAudioPlayerDidFinishPlaying, object: nil, queue: nil) { [weak self] notification in
-                guard let player = notification.object as? AVAudioPlayer else { return }
-                self?.audioPlayerDidFinishPlaying(player)
-            }
         }
-
-        deinit {
-            NotificationCenter.default.removeObserver(observation!)
-        }
-
+        
         public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
             let attributes = call.arguments as! NSDictionary
+            //            print("\(call.method): \(attributes)")
             switch call.method {
             case "load":
                 let rawSound = attributes["rawSound"] as! FlutterStandardTypedData
@@ -162,7 +161,7 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
                 }
             case "loadUri":
                 let soundUri = attributes["uri"] as! String
-
+                
                 let url = URL(string: soundUri)
                 if (url != nil){
                     DispatchQueue.global(qos: .utility).async {
@@ -176,8 +175,8 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
                                         audioPlayer.enableRate = true
                                     }
                                     audioPlayer.prepareToPlay()
-                                    let index = self.soundpool.count
-                                    self.soundpool.append(audioPlayer)
+                                    let index = self.self.soundpool.count
+                                    self.self.soundpool.append(audioPlayer)
                                     value = index
                                 } catch {
                                     print("Unexpected error while preparing player: \(error).")
@@ -202,32 +201,32 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
                     result(0)
                     break
                 }
-
+                
                 guard var audioPlayer = playerBySoundId(soundId: soundId) else {
                     result(0)
                     break
                 }
                 do {
                     let currentCount = streamsCount[soundId] ?? 0
-
+                    
                     if (currentCount >= maxStreams){
                         result(0)
                         break
                     }
-
+                    
                     let nowPlayingData: NowPlaying
                     let streamId: Int = streamIdProvider.increment()
-
+                    
                     let delegate = SoundpoolDelegate(pool: self, soundId: soundId, streamId: streamId)
                     audioPlayer.delegate = delegate
                     nowPlayingData =  NowPlaying(player: audioPlayer, delegate: delegate)
-
+                    
                     audioPlayer.numberOfLoops = times ?? 0
                     if (enableRate){
                         audioPlayer.enableRate = true
                         audioPlayer.rate = Float(rate)
                     }
-
+                    
                     if (audioPlayer.play()) {
                         streamsCount[soundId] = currentCount + 1
                         nowPlaying[streamId] = nowPlayingData
@@ -235,7 +234,8 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
                     } else {
                         result(0) // failed to play sound
                     }
-
+                    // lets recreate the audioPlayer for next request - setting numberOfLoops has initially no effect
+                    
                     if let previousData = audioPlayer.data {
                         audioPlayer = try AVAudioPlayer(data: previousData)
                     } else if let previousUrl = audioPlayer.url {
@@ -271,41 +271,43 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
                     let audioPlayer = nowPlaying.player
                     audioPlayer.stop()
                     result(streamId)
+                    // removing player
                     self.nowPlaying.removeValue(forKey: streamId)
                     nowPlaying.delegate.decreaseCounter()
                     audioPlayer.delegate = nil
                 } else {
                     result(-1)
                 }
-            case "setVolume":
-                let streamId = attributes["streamId"] as? Int
-                let soundId = attributes["soundId"] as? Int
-                let volume = attributes["volume"] as? Double
-                let volumeLeft = attributes["volumeLeft"] as? Double
-                let volumeRight = attributes["volumeRight"] as? Double
+       case "setVolume":
+            let streamId = attributes["streamId"] as? Int
+            let soundId = attributes["soundId"] as? Int
+            let volume = attributes["volume"] as? Double
+            let volumeLeft = attributes["volumeLeft"] as? Double
+            let volumeRight = attributes["volumeRight"] as? Double
 
-                var audioPlayer: AVAudioPlayer? = nil;
-                if (streamId != nil){
-                    audioPlayer = playerByStreamId(streamId: streamId!)?.player
-                } else if (soundId != nil){
-                    audioPlayer = playerBySoundId(soundId: soundId!)
-                }
+            var audioPlayer: AVAudioPlayer? = nil;
+            if (streamId != nil){
+                audioPlayer = playerByStreamId(streamId: streamId!)?.player
+            } else if (soundId != nil){
+                audioPlayer = playerBySoundId(soundId: soundId!)
+            }
 
-                if let volumeLeft = volumeLeft, let volumeRight = volumeRight {
-                    let totalVolume = volumeLeft + volumeRight
-                    let normalizedVolumeLeft = volumeLeft / totalVolume
-                    let normalizedVolumeRight = volumeRight / totalVolume
+            if let volumeLeft = volumeLeft, let volumeRight = volumeRight {
+                // Normalize volumeLeft and volumeRight to ensure they sum up to 1.0
+                let totalVolume = volumeLeft + volumeRight
+                let normalizedVolumeLeft = volumeLeft / totalVolume
+                let normalizedVolumeRight = volumeRight / totalVolume
 
-                    audioPlayer?.pan = Float(normalizedVolumeRight - normalizedVolumeLeft)
-                }
+                audioPlayer?.pan = Float(normalizedVolumeRight - normalizedVolumeLeft) // Set panning
+            }
 
-                if let volume = volume {
-                    audioPlayer?.volume = Float(volume)
-                } else {
-                    audioPlayer?.volume = Float((volumeLeft ?? 0.5) + (volumeRight ?? 0.5))
-                }
+            if let volume = volume {
+                audioPlayer?.volume = Float(volume) // Set specified volume
+            } else {
+                audioPlayer?.volume = Float((volumeLeft ?? 0.5) + (volumeRight ?? 0.5)) // Set average volume if volume is not provided
+            }
 
-                result(nil)
+            result(nil)
 
             case "setRate":
                 if (enableRate){
@@ -315,7 +317,7 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
                     audioPlayer?.rate = Float(rate)
                 }
                 result(nil)
-            case "release":
+            case "release": // TODO this should distinguish between soundpools for different types of audio playbacks
                 stopAllStreams()
                 soundpool.removeAll()
                 result(nil)
@@ -323,18 +325,17 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
                 result("notImplemented")
             }
         }
-
+        
         func stopAllStreams() {
             for audioPlayer in soundpool {
                 audioPlayer.stop()
             }
         }
-
         private func playerByStreamId(streamId: Int) -> NowPlaying? {
             let audioPlayer = nowPlaying[streamId]
             return audioPlayer
         }
-
+        
         private func playerBySoundId(soundId: Int) -> AVAudioPlayer? {
             if (soundId >= soundpool.count || soundId < 0){
                 return nil
@@ -342,20 +343,7 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
             let audioPlayer = soundpool[soundId]
             return audioPlayer
         }
-
-        private func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer) {
-            if let soundId = soundpool.firstIndex(of: player) {
-                decreaseCounter(soundId: soundId)
-            }
-        }
-
-        private func decreaseCounter(soundId: Int){
-            streamsCount[soundId] = (streamsCount[soundId] ?? 1) - 1
-            if let streamIdToRemove = nowPlaying.first(where: { $0.value.player == playerBySoundId(soundId: soundId) })?.key {
-                nowPlaying.removeValue(forKey: streamIdToRemove)
-            }
-        }
-
+        
         private class SoundpoolDelegate: NSObject, AVAudioPlayerDelegate {
             private var soundId: Int
             private var streamId: Int
@@ -366,10 +354,14 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
                 self.streamId = streamId
             }
             func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-                pool.decreaseCounter(soundId: soundId)
+                decreaseCounter()
+            }
+            func decreaseCounter(){
+                pool.streamsCount[soundId] = (pool.streamsCount[soundId] ?? 1) - 1
+                pool.nowPlaying.removeValue(forKey: streamId)
             }
         }
-
+        
         private struct NowPlaying {
             let player: AVAudioPlayer
             let delegate: SoundpoolDelegate
