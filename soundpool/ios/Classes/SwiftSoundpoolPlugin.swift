@@ -194,61 +194,77 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
                     result(-1)
                 }
             case "play":
-                let soundId = attributes["soundId"] as! Int
+                       let soundId = attributes["soundId"] as! Int
                 let times = attributes["repeat"] as? Int
-                let rate = (attributes["rate"] as? Double) ?? 1.0
-                if (soundId < 0){
-                    result(0)
-                    break
-                }
-                
-                guard var audioPlayer = playerBySoundId(soundId: soundId) else {
-                    result(0)
-                    break
-                }
-                do {
-                    let currentCount = streamsCount[soundId] ?? 0
-                    
-                    if (currentCount >= maxStreams){
-                        result(0)
-                        break
-                    }
-                    
-                    let nowPlayingData: NowPlaying
-                    let streamId: Int = streamIdProvider.increment()
-                    
-                    let delegate = SoundpoolDelegate(pool: self, soundId: soundId, streamId: streamId)
-                    audioPlayer.delegate = delegate
-                    nowPlayingData =  NowPlaying(player: audioPlayer, delegate: delegate)
-                    
-                    audioPlayer.numberOfLoops = times ?? 0
-                    if (enableRate){
-                        audioPlayer.enableRate = true
-                        audioPlayer.rate = Float(rate)
-                    }
-                    
-                    if (audioPlayer.play()) {
-                        streamsCount[soundId] = currentCount + 1
-                        nowPlaying[streamId] = nowPlayingData
-                        result(streamId)
-                    } else {
-                        result(0) // failed to play sound
-                    }
-                    // lets recreate the audioPlayer for next request - setting numberOfLoops has initially no effect
-                    
-                    if let previousData = audioPlayer.data {
-                        audioPlayer = try AVAudioPlayer(data: previousData)
-                    } else if let previousUrl = audioPlayer.url {
-                        audioPlayer = try AVAudioPlayer(contentsOf: previousUrl)
-                    }
-                    if (enableRate){
-                        audioPlayer.enableRate = true
-                    }
-                    audioPlayer.prepareToPlay()
-                    soundpool[soundId] = audioPlayer
-                } catch {
-                    result(0)
-                }
+    let rate = (attributes["rate"] as? Double) ?? 1.0
+    let loopStart = (attributes["loopStart"] as? Double) ?? 0.0
+    let loopEnd = (attributes["loopEnd"] as? Double) ?? 0.0
+
+    if (soundId < 0){
+        result(0)
+        break
+    }
+
+    guard var audioPlayer = playerBySoundId(soundId: soundId) else {
+        result(0)
+        break
+    }
+
+    do {
+        let currentCount = streamsCount[soundId] ?? 0
+
+        if (currentCount >= maxStreams){
+            result(0)
+            break
+        }
+
+        let nowPlayingData: NowPlaying
+        let streamId: Int = streamIdProvider.increment()
+
+        let delegate = SoundpoolDelegate(pool: self, soundId: soundId, streamId: streamId)
+        audioPlayer.delegate = delegate
+        nowPlayingData =  NowPlaying(player: audioPlayer, delegate: delegate)
+
+        audioPlayer.numberOfLoops = times ?? 0
+        if (enableRate){
+            audioPlayer.enableRate = true
+            audioPlayer.rate = Float(rate)
+        }
+
+        if loopStart > 0.0 && loopEnd > 0.0 {
+            let loopDuration = loopEnd - loopStart
+            let bufferLength = Int(loopDuration * audioPlayer.sampleRate * Double(audioPlayer.numberOfChannels) * audioPlayer.bytesPerFrame)
+            let buffer = AVAudioPCMBuffer(pcmFormat: audioPlayer.format, frameCapacity: AVAudioFrameCount(bufferLength))
+            buffer.frameLength = buffer.frameCapacity
+
+            let audioLength = Int(audioPlayer.duration * audioPlayer.sampleRate) - bufferLength
+
+            var bufferIndex = 0
+            let audioData = audioPlayer.data!
+            let bufferData = buffer.mutableAudioBufferList.pointee.mBuffers
+
+            for i in 0..<Int(bufferData.mNumberBuffers) {
+                let mData = bufferData.mBuffers.mData!
+                let startOffset = i * audioPlayer.bytesPerFrame
+                let audioStartIndex = Int(loopStart * audioPlayer.sampleRate) * audioPlayer.numberOfChannels * audioPlayer.bytesPerFrame + startOffset
+                let audioEndIndex = audioStartIndex + bufferLength
+
+                audioData.copyBytes(to: mData.advanced(by: bufferIndex), from: audioStartIndex..<audioEndIndex)
+                bufferIndex += bufferLength
+            }
+
+            audioPlayer.scheduleBuffer(buffer, at: nil, options: .loops, completionHandler: nil)
+            audioPlayer.play()
+        } else {
+            audioPlayer.play()
+        }
+
+        streamsCount[soundId] = currentCount + 1
+        nowPlaying[streamId] = nowPlayingData
+        result(streamId)
+    } catch {
+        result(0)
+    }
             case "pause":
                 let streamId = attributes["streamId"] as! Int
                 if let playingData = playerByStreamId(streamId: streamId) {
