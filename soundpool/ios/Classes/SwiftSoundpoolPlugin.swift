@@ -147,9 +147,25 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
             switch call.method {
          case "load":
     let rawSound = attributes["rawSound"] as! FlutterStandardTypedData
+    let data = rawSound.data
+    var paddedData = Data()
+    let blockSize = 1024
+
+    // Check if the data length is a multiple of blockSize
+    if data.count % blockSize != 0 {
+        // Calculate the number of padding bytes needed
+        let paddingLength = blockSize - (data.count % blockSize)
+        // Append the original data
+        paddedData.append(data)
+        // Append padding (silence) bytes
+        paddedData.append(Data(count: paddingLength))
+    } else {
+        // No padding needed, use original data
+        paddedData = data
+    }
+
     do {
-        // Ensure the audio data is uncompressed
-        let audioPlayer = try AVAudioPlayer(data: rawSound.data, fileTypeHint: AVFileType.wav.rawValue)
+        let audioPlayer = try AVAudioPlayer(data: paddedData)
         if (enableRate){
             audioPlayer.enableRate = true
         }
@@ -160,20 +176,34 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
     } catch {
         result(-1)
     }
-
 case "loadUri":
-    let soundUri = attributes["uri"] as! String
-    
+ let soundUri = attributes["uri"] as! String
+
     let url = URL(string: soundUri)
     if (url != nil){
         DispatchQueue.global(qos: .utility).async {
             do {
-                // Ensure the audio file is downloaded and stored in an uncompressed format
                 let cachedSound = try Data(contentsOf: url!, options: NSData.ReadingOptions.mappedIfSafe)
+                var paddedData = Data()
+                let blockSize = 1024
+
+                // Check if the data length is a multiple of blockSize
+                if cachedSound.count % blockSize != 0 {
+                    // Calculate the number of padding bytes needed
+                    let paddingLength = blockSize - (cachedSound.count % blockSize)
+                    // Append the original data
+                    paddedData.append(cachedSound)
+                    // Append padding (silence) bytes
+                    paddedData.append(Data(count: paddingLength))
+                } else {
+                    // No padding needed, use original data
+                    paddedData = cachedSound
+                }
+
                 DispatchQueue.main.async {
                     var value:Int = -1
                     do {
-                        let audioPlayer = try AVAudioPlayer(data: cachedSound, fileTypeHint: AVFileType.wav.rawValue)
+                        let audioPlayer = try AVAudioPlayer(data: paddedData)
                         if (self.enableRate){
                             audioPlayer.enableRate = true
                         }
