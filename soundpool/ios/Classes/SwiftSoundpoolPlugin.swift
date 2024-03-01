@@ -60,7 +60,159 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
         private var enableRate: Bool
         private lazy var streamsCount: Dictionary<Int, Int> = [Int: Int]()
         private lazy var nowPlaying: Dictionary<Int, NowPlaying> = [Int: NowPlaying]()
-        private lazy var audioUnit: AudioUnit = {
+        private lazy var audioUnit: AudioUnit = createAudioUnit()!
+
+        init(_ maxStreams: Int, _ enableRate: Bool){
+            self.maxStreams = maxStreams
+            self.enableRate = enableRate
+        }
+
+        public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+            let attributes = call.arguments as! NSDictionary
+            switch call.method {
+            case "load":
+                let soundId = call.arguments as! Int
+                let soundUri = call.arguments as! String
+
+                guard let url = URL(string: soundUri) else {
+                    result(-1)
+                    break
+                }
+
+                do {
+                    let asset = AVURLAsset(url: url)
+                    let audioFile = try AVAudioFile(forReading: asset.url)
+
+                    var audioFormat = audioFile.processingFormat
+                    let audioFrames = UInt32(audioFile.length)
+                    guard let audioBuffer = AVAudioPCMBuffer(pcmFormat: audioFormat, frameCapacity: audioFrames) else {
+                        result(-1)
+                        break
+                    }
+
+                    try audioFile.read(into: audioBuffer)
+
+                    let playerNode = AVAudioPlayerNode()
+                    audioUnit.attach(playerNode)
+                    audioUnit.connect(playerNode, to: audioUnit.mainMixerNode, format: audioFormat)
+
+                    let audioUnitData = AudioUnitData(audioUnit: audioUnit, playerNode: playerNode, buffer: audioBuffer)
+                    audioUnits[soundId] = audioUnitData
+
+                    result(soundId)
+                } catch {
+                    result(-1)
+                }
+            case "play":
+                let soundId = call.arguments as! Int
+
+                guard let audioUnitData = audioUnits[soundId] else {
+                    result(-1)
+                    break
+                }
+
+                if !audioUnitData.playerNode.isPlaying {
+                    audioUnitData.playerNode.play()
+                }
+
+                result(nil)
+            case "pause":
+                let soundId = call.arguments as! Int
+
+                guard let audioUnitData = audioUnits[soundId] else {
+                    result(-1)
+                    break
+                }
+
+                if audioUnitData.playerNode.isPlaying {
+                    audioUnitData.playerNode.pause()
+                }
+
+                result(nil)
+            case "resume":
+                let soundId = call.arguments as! Int
+
+                guard let audioUnitData = audioUnits[soundId] else {
+                    result(-1)
+                    break
+                }
+
+                if !audioUnitData.playerNode.isPlaying {
+                    audioUnitData.playerNode.play()
+                }
+
+                result(nil)
+            case "stop":
+                let soundId = call.arguments as! Int
+
+                guard let audioUnitData = audioUnits[soundId] else {
+                    result(-1)
+                    break
+                }
+
+                if audioUnitData.playerNode.isPlaying {
+                    audioUnitData.playerNode.stop()
+                }
+
+                result(nil)
+            case "setVolume":
+                let soundId = call.arguments as! Int
+                let volumeLeft = call.arguments as! Double
+                let volumeRight = call.arguments as! Double
+
+                guard let audioUnitData = audioUnits[soundId] else {
+                    result(-1)
+                    break
+                }
+
+                // Normalize volumeLeft and volumeRight to ensure they sum up to 1.0
+                let totalVolume = volumeLeft + volumeRight
+                let normalizedVolumeLeft = volumeLeft / totalVolume
+                let normalizedVolumeRight = volumeRight / totalVolume
+
+                // Set panning
+                audioUnitData.playerNode.pan = Float(normalizedVolumeRight - normalizedVolumeLeft)
+
+                result(nil)
+            case "setRate":
+                let streamId = attributes["streamId"] as! Int
+                let rate = attributes["rate"] as! Double
+                let success = setRate(streamId: streamId, rate: rate)
+                result(success)
+            case "release":
+                // Release resources
+                result(nil)
+            default:
+                result("notImplemented")
+            }
+        }
+
+        private func setRate(streamId: Int, rate: Double) -> Bool {
+            guard let audioUnitData = audioUnits[streamId] else {
+                return false
+            }
+            audioUnitData.playerNode.rate = Float(rate)
+            return true
+        }
+
+        func stopAllStreams() {
+            for (streamId, audioUnitData) in audioUnits {
+                audioUnitData.playerNode.stop()
+                // Remove the stopped audio unit from the dictionary
+                audioUnits[streamId] = nil
+            }
+        }
+
+        private func playerByStreamId(streamId: Int) -> NowPlaying? {
+            let audioPlayer = nowPlaying[streamId]
+            return audioPlayer
+        }
+
+        private func playerBySoundId(soundId: Int) -> AudioUnit? {
+            return audioUnits[soundId]?.audioUnit
+        }
+
+        private func createAudioUnit() -> AudioUnit? {
             var unit: AudioUnit?
             var desc = AudioComponentDescription(
                 componentType: kAudioUnitType_Output,
@@ -71,163 +223,18 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
             )
             let comp = AudioComponentFindNext(nil, &desc)
             AudioComponentInstanceNew(comp!, &unit)
-            return unit!
-        }()
-
-        init(_ maxStreams: Int, _ enableRate: Bool){
-            self.maxStreams = maxStreams
-            self.enableRate = enableRate
+            return unit
         }
 
-        public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-            let attributes = call.arguments as! NSDictionary
-            switch call.method {
-      case "load":
-            let soundId = call.arguments as! Int
-            let soundUri = call.arguments as! String
-
-            guard let url = URL(string: soundUri) else {
-                result(-1)
-                break
-            }
-
-            do {
-                let asset = AVURLAsset(url: url)
-                let audioFile = try AVAudioFile(forReading: asset.url)
-
-                var audioFormat = audioFile.processingFormat
-                let audioFrames = UInt32(audioFile.length)
-                guard let audioBuffer = AVAudioPCMBuffer(pcmFormat: audioFormat, frameCapacity: audioFrames) else {
-                    result(-1)
-                    break
-                }
-
-                try audioFile.read(into: audioBuffer)
-
-                let audioUnit = createAudioUnit()
-                let playerNode = AVAudioPlayerNode()
-                audioUnit.attach(playerNode)
-                audioUnit.connect(playerNode, to: audioUnit.mainMixerNode, format: audioFormat)
-
-                let audioUnitData = AudioUnitData(audioUnit: audioUnit, playerNode: playerNode, buffer: audioBuffer)
-                audioUnits[soundId] = audioUnitData
-
-                result(soundId)
-            } catch {
-                result(-1)
-            }
-        case "play":
-            let soundId = call.arguments as! Int
-
-            guard let audioUnitData = audioUnits[soundId] else {
-                result(-1)
-                break
-            }
-
-            if !audioUnitData.playerNode.isPlaying {
-                audioUnitData.playerNode.play()
-            }
-
-            result(nil)
-        case "pause":
-            let soundId = call.arguments as! Int
-
-            guard let audioUnitData = audioUnits[soundId] else {
-                result(-1)
-                break
-            }
-
-            if audioUnitData.playerNode.isPlaying {
-                audioUnitData.playerNode.pause()
-            }
-
-            result(nil)
-        case "resume":
-            let soundId = call.arguments as! Int
-
-            guard let audioUnitData = audioUnits[soundId] else {
-                result(-1)
-                break
-            }
-
-            if !audioUnitData.playerNode.isPlaying {
-                audioUnitData.playerNode.play()
-            }
-
-            result(nil)
-        case "stop":
-            let soundId = call.arguments as! Int
-
-            guard let audioUnitData = audioUnits[soundId] else {
-                result(-1)
-                break
-            }
-
-            if audioUnitData.playerNode.isPlaying {
-                audioUnitData.playerNode.stop()
-            }
-
-            result(nil)
-        case "setVolume":
-            let soundId = call.arguments as! Int
-            let volumeLeft = call.arguments as! Double
-            let volumeRight = call.arguments as! Double
-
-            guard let audioUnitData = audioUnits[soundId] else {
-                result(-1)
-                break
-            }
-
-            // Normalize volumeLeft and volumeRight to ensure they sum up to 1.0
-            let totalVolume = volumeLeft + volumeRight
-            let normalizedVolumeLeft = volumeLeft / totalVolume
-            let normalizedVolumeRight = volumeRight / totalVolume
-
-            // Set panning
-            audioUnitData.playerNode.pan = Float(normalizedVolumeRight - normalizedVolumeLeft)
-
-            result(nil)
-		case "setRate":
-			let streamId = attributes["streamId"] as! Int
-			let rate = attributes["rate"] as! Double
-			let success = setRate(streamId: streamId, rate: rate)
-			result(success)
-        case "release":
-            // Release resources
-            result(nil)
-            default:
-                result("notImplemented")
-            }
+        private struct AudioUnitData {
+            let audioUnit: AudioUnit
+            let playerNode: AVAudioPlayerNode
+            let buffer: AVAudioPCMBuffer
         }
-
-		private func setRate(streamId: Int, rate: Double) -> Bool {
-            guard let audioUnitData = audioUnits[streamId] else {
-                return false
-            }
-            audioUnitData.playerNode.rate = Float(rate)
-            return true
-        }
-		
-      func stopAllStreams() {
-			for (streamId, audioUnitData) in audioUnits {
-			audioUnitData.playerNode.stop()
-        // Remove the stopped audio unit from the dictionary
-				audioUnits[streamId] = nil
-			}
-		}
-
-        private func playerByStreamId(streamId: Int) -> NowPlaying? {
-            let audioPlayer = nowPlaying[streamId]
-            return audioPlayer
-        }
-
-		private func playerBySoundId(soundId: Int) -> AudioUnit? {
-			return audioUnits[soundId]?.audioUnit
-		}
 
         private struct NowPlaying {
             let player: AudioUnit
-            //let delegate: SoundpoolDelegate
+            let delegate: SoundpoolDelegate
         }
     }
 }
