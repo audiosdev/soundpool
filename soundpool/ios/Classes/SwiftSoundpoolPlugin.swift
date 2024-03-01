@@ -209,7 +209,7 @@ public class SwiftSoundpoolPlugin: NSObject, FlutterPlugin {
 
         private struct NowPlaying {
             let player: AVAudioPlayerNode
-            let delegate: SoundpoolDelegate
+            //let delegate: SoundpoolDelegate
         }
     }
 
