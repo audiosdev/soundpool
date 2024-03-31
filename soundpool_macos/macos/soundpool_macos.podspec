@@ -9,7 +9,7 @@ Pod::Spec.new do |s|
   s.description      = <<-DESC
   A Flutter Sound Pool for playing short media files.
                        DESC
-  s.homepage         = 'https://github.com/ukasz123/soundpool/tree/master/soundpool_macos'
+  s.homepage         = 'https://github.com/audiosdev/soundpool/tree/master/soundpool_macos'
   s.license          = { :file => '../LICENSE' }
   s.author           = { 'Łukasz Huculak' => 'ukasz.apps@gmail.com' }
   s.source           = { :path => '.' }
