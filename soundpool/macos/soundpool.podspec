@@ -9,7 +9,7 @@ Pod::Spec.new do |s|
   s.description      = <<-DESC
 temp fake soundpool plugin
                        DESC
-  s.homepage         = 'https://github.com/ukasz123/soundpool/tree/master/soundpool'
+  s.homepage         = 'https://github.com/audiosdev/soundpool/tree/master/soundpool'
   s.license          = { :file => '../LICENSE' }
   s.author           = { 'Your Company' => 'email@example.com' }
   s.source           = { :path => '.' }
