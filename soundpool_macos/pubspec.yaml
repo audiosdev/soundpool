@@ -3,7 +3,6 @@ description: A Flutter Sound Pool for playing short audio files. Sound tracks ar
 version: 2.3.0
 homepage: https://github.com/audiosdev/soundpool/tree/master/soundpool_macos
 
-
 environment:
   sdk: '>=3.0.0 <4.0.0'
   flutter: ">=3.10.0"
@@ -12,7 +11,10 @@ dependencies:
   flutter:
     sdk: flutter
 
-  soundpool_platform_interface: ^2.1.0
+  soundpool_platform_interface:
+    git:
+      url: https://github.com/audiosdev/soundpool.git
+      path: soundpool_platform_interface
 
 dev_dependencies:
   flutter_test:
