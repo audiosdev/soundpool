@@ -20,6 +20,14 @@ dependencies:
     git:
       url: https://github.com/audiosdev/soundpool.git
       path: soundpool_web
+
+  soundpool_macos:
+    git:
+      url: https://github.com/audiosdev/soundpool.git
+      path: soundpool_macos
+
+dependency_overrides:
+  soundpool_web:
     dependency_overrides:
       soundpool_platform_interface:
         git:
@@ -27,9 +35,6 @@ dependencies:
           path: soundpool_platform_interface
 
   soundpool_macos:
-    git:
-      url: https://github.com/audiosdev/soundpool.git
-      path: soundpool_macos
     dependency_overrides:
       soundpool_platform_interface:
         git:
